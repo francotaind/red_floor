@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#16181a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Red Floor Shooter</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,8 +31,9 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--floor);color:var(--ink);font:600 16px/1.3 var(--font-body);overflow:hidden;
-  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+body{background:var(--floor);color:var(--ink);font:600 16px/1.3 var(--font-body);overflow:hidden;overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+button{touch-action:manipulation}
 [hidden]{display:none!important}
 
 .stage{position:relative;height:100%;min-height:320px;overflow:hidden;background:var(--floor)}
@@ -111,6 +119,48 @@ button:focus-visible{outline:3px solid var(--blood);outline-offset:3px}
   .score{font-size:34px}
   .wave{font-size:20px}
 }
+/* Phone: twin sticks drawn on the canvas, three thumb buttons on the right, a slim HUD along the top */
+.pad{display:none;position:absolute;right:12px;top:54px;flex-direction:column;gap:10px;align-items:flex-end}
+.pbtn{pointer-events:auto;cursor:pointer;width:64px;height:64px;border-radius:50%;padding:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;color:var(--ink);background:rgba(242,243,239,.88);border:2px solid var(--ink);
+  font:600 11px/1 var(--font-body);letter-spacing:.08em;text-transform:uppercase}
+.pbtn b{font:400 20px/1 var(--font-display);font-variant-numeric:tabular-nums}
+.pbtn:active,.pbtn.on{background:var(--ink);color:var(--paper)}
+.pbtn.gunb{width:auto;min-width:64px;max-width:150px;border-radius:32px;padding:0 14px;flex-direction:row;gap:8px;white-space:nowrap}
+.pbtn.gunb span{overflow:hidden;text-overflow:ellipsis}
+.pbtn.empty{opacity:.45}
+.k-touch{display:none}
+.stage[data-touch="1"] .k-desk{display:none}
+.stage[data-touch="1"] .k-touch{display:contents}
+.stage[data-touch="1"][data-mode="play"] .pad{display:flex}
+.stage[data-touch="1"] .dock{display:none}
+.stage[data-touch="1"] .vitals{left:10px;top:8px;width:auto;flex-direction:row;align-items:center;gap:10px;
+  background:rgba(242,243,239,.88);border:2px solid var(--ink);padding:5px 9px}
+.stage[data-touch="1"] .vitals .label{display:none}
+.stage[data-touch="1"] .bar{width:min(110px,22vw);height:12px}
+.stage[data-touch="1"] .wave{font-size:18px}
+.stage[data-touch="1"] .wave small{font-size:12px}
+.stage[data-touch="1"] .tally{right:10px;top:8px;flex-direction:row;align-items:baseline;gap:8px;
+  background:rgba(242,243,239,.88);border:2px solid var(--ink);padding:5px 9px}
+.stage[data-touch="1"] .score{font-size:24px}
+.stage[data-touch="1"] .util{left:10px;top:54px;transform:none}
+.stage[data-touch="1"] .chip{padding:8px 10px}
+.stage[data-touch="1"] #banner{top:16%;font-size:clamp(36px,8vw,64px)}
+.rotate{display:none;position:absolute;inset:0;z-index:9;background:var(--ink);color:var(--paper);flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px}
+.rotate svg{width:88px;height:88px;stroke:var(--paper);fill:none;stroke-width:3}
+.rotate p{margin:0;font:400 30px/1.05 var(--font-display);max-width:12ch}
+.rotate small{font:600 14px/1.3 var(--font-body);letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+@media (orientation:portrait){ .stage[data-touch="1"] .rotate{display:flex} }
+@media (max-height:520px){
+  .panel{gap:9px}
+  h1{font-size:clamp(48px,11vh,72px)}
+  h2{font-size:clamp(34px,9vh,56px)}
+  .lede{font-size:15px}
+  .keys{font-size:14px;gap:3px 12px}
+  .btn{font-size:22px;padding:12px 20px 13px}
+  .stats dd{font-size:30px}
+}
 @media (prefers-reduced-motion:reduce){
   #banner.show{animation:bannerStill 2.4s linear forwards}
   @keyframes bannerStill{0%,85%{opacity:1}100%{opacity:0}}
@@ -141,6 +191,12 @@ button:focus-visible{outline:3px solid var(--blood);outline-offset:3px}
       <span class="label">Best <span id="best">0</span></span>
     </div>
 
+    <div class="pad" id="pad">
+      <button class="pbtn gunb" id="p-gun" type="button" aria-label="Next gun"><span id="p-gun-name">Pistol</span><b id="p-ammo">15</b></button>
+      <button class="pbtn" id="p-bang" type="button" aria-label="Throw a flashbang">Flash<b id="p-bang-n">3</b></button>
+      <button class="pbtn" id="p-reload" type="button" aria-label="Reload">Reload</button>
+    </div>
+
     <div class="dock">
       <div class="readout">
         <span class="label" id="gun-name">Pistol</span>
@@ -151,20 +207,33 @@ button:focus-visible{outline:3px solid var(--blood);outline-offset:3px}
     </div>
   </div>
 
+  <div class="rotate" id="rotate" role="alert">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="20" y="8" width="24" height="44" rx="4"/><path d="M8 40a24 24 0 0 0 24 18M8 40l-2 7M8 40l7 2"/></svg>
+    <p>Turn your phone sideways</p>
+    <small>Red Floor plays in landscape</small>
+  </div>
+
   <div class="overlay" id="overlay">
     <section class="panel" id="scr-title">
       <h1><span>Red</span>Floor</h1>
       <p class="lede">Clear the building room by room. You only see what your operator sees, so check corners, kick doors in and throw a flashbang before you enter. Keep the hostages alive.</p>
       <dl class="keys">
-        <dt>Move</dt><dd><b>W</b><b>A</b><b>S</b><b>D</b> or arrows. Walk into doors to kick them</dd>
+        <div class="k-touch"><dt>Move</dt><dd>Left thumb, anywhere on the left half</dd>
+        <dt>Aim</dt><dd>Right thumb; push further to fire</dd>
+        <dt>Doors</dt><dd>Walk into one to kick it in</dd>
+        <dt>Buttons</dt><dd>Swap gun, flashbang, reload</dd></div>
+        <div class="k-desk"><dt>Move</dt><dd><b>W</b><b>A</b><b>S</b><b>D</b> or arrows. Walk into doors to kick them</dd>
         <dt>Shoot</dt><dd>Aim with the mouse, hold to fire</dd>
         <dt>Guns</dt><dd><b>1</b> to <b>7</b>, or mouse wheel</dd>
         <dt>Flashbang</dt><dd><b>F</b> or right-click, thrown at the crosshair</dd>
         <dt>Other</dt><dd><b>R</b> reload, <b>P</b> pause</dd>
-        <dt>Touch</dt><dd>Drag the left side to move, hold the right side to fire</dd>
+        </div>
       </dl>
-      <button class="btn" id="btn-start" type="button">Breach</button>
-      <span class="label">or press Enter</span>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <button class="btn" id="btn-start" type="button">Breach</button>
+        <button class="chip" id="btn-install" type="button" hidden>Install app</button>
+      </div>
+      <span class="label k-desk">or press Enter</span>
     </section>
 
     <section class="panel" id="scr-pause" hidden>
@@ -210,6 +279,14 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 let VW = 800, VH = 600, DPR = 1;      // viewport, CSS px
 let W = 800, H = 600;                 // world size, fixed while a floor is in play
 let vs = 1, vox = 0, voy = 0;         // world to viewport
+let touchMode = false;                // phone play: twin sticks and a camera that follows you
+const cam = { x: 0, y: 0, on: false };
+function setTouch(on) {
+  if (touchMode === on) return;
+  touchMode = on; stage.dataset.touch = on ? '1' : '';
+  if (on) input.mouse = false;
+}
+function buzz(ms) { if (!touchMode || !navigator.vibrate) return; try { navigator.vibrate(ms); } catch (e) {} }
 const TH = 10;                        // wall thickness
 let L = null;                         // current floor plan
 
@@ -244,7 +321,7 @@ const S = { mode: 'title', score: 0, kills: 0, rescued: 0, wave: 1, best: 0, gun
 let ammo = GUNS.map(g => g.mag), reloadT = 0, cool = 0;
 let enemies = [], bullets = [], shots = [], drops = [], pools = [], shells = [], puffs = [];
 let barrels = [], hostages = [], bangs = [], blasts = [], wet = [], floaters = [];
-const input = { up: 0, down: 0, left: 0, right: 0, fire: false, ax: 0, ay: 0, joy: null, aimId: null, mouse: true };
+const input = { up: 0, down: 0, left: 0, right: 0, fire: false, ax: 0, ay: 0, joy: null, aim: null, aimId: null, mouse: true };
 
 /* ---------- sound (small synth, starts on the first click) ---------- */
 let AC = null, noiseBuf = null, muted = false;
@@ -373,11 +450,27 @@ function measure() {
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   const cw = Math.round(VW * DPR), ch = Math.round(VH * DPR);
   if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
-  vs = Math.min(VW / W, VH / H); vox = (VW - W * vs) / 2; voy = (VH - H * vs) / 2;
+  if (!camOn()) { vs = Math.min(VW / W, VH / H); vox = (VW - W * vs) / 2; voy = (VH - H * vs) / 2; }
 }
+const camOn = () => touchMode && S.mode !== 'title';
+const camScale = () => clamp(VH / 360, 1, 1.45);
+// follow the operator, a little ahead of where they are aiming, and stop at the building's edges
+function placeCam(snap) {
+  vs = camScale();
+  const vw = VW / vs, vh = VH / vs;
+  let tx = P.x + Math.cos(P.ang) * vw * 0.12, ty = P.y + Math.sin(P.ang) * vh * 0.12;
+  const padR = 96 / vs;
+  tx = W + padR <= vw ? (W + padR) / 2 : clamp(tx, vw / 2, W - vw / 2 + padR);
+  ty = H <= vh ? H / 2 : clamp(ty, vh / 2 - 46 / vs, H - vh / 2 + 10 / vs);
+  if (snap) { cam.x = tx; cam.y = ty; }
+  else { const k = Math.min(1, 6 * frameDt); cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k; }
+  vox = VW / 2 - cam.x * vs; voy = VH / 2 - cam.y * vs;
+}
+let frameDt = 0.016;
 let lastVW = 0, lastVH = 0;
 function onResize() {
   measure();
+  if (touchMode && VH > VW && S.mode === 'play') setMode('paused');
   if (VW === lastVW && VH === lastVH) return;
   lastVW = VW; lastVH = VH;
   if (S.mode === 'title') buildTitle();   // a floor in play keeps its size and is scaled to fit
@@ -401,12 +494,13 @@ function freeSpot(room, m, ok) {
 }
 function buildLevel(floor) {
   measure();
-  W = Math.max(340, VW); H = Math.max(460, VH);
+  if (touchMode) { const z = camScale(); W = Math.max(900, VW / z * 1.5); H = Math.max(540, VH / z * 1.7); }
+  else { W = Math.max(340, VW); H = Math.max(460, VH); }
   measure();
   for (const c of [floorCv, decalCv]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
   dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-  const h = TH / 2, narrow = VW < 760, top = narrow ? 112 : 84, bot = narrow ? 108 : 66;
+  const h = TH / 2, narrow = VW < 760, top = touchMode ? 24 : narrow ? 112 : 84, bot = touchMode ? 24 : narrow ? 108 : 66;
   const bx = 14 + h, by = top, bw = W - 2 * bx, bh = H - top - bot;
   const cols = clamp(Math.round(bw / 250), 2, 5), rows = clamp(Math.round(bh / 240), 2, 4);
   const xs = [bx], ys = [by];
@@ -552,7 +646,7 @@ function openDoor(d, fx, fy, kicked) {
   rebuildObs();
   for (let i = 0; i < 6; i++) puffs.push({ x: d.cx + rnd(-1, 1) * (d.v ? 5 : d.g / 2), y: d.cy + rnd(-1, 1) * (d.v ? d.g / 2 : 5), t: 0, life: rnd(0.12, 0.25), r: rnd(4, 8), ink: true });
   if (!kicked) { sfx.door(); return; }
-  sfx.breach(); shake(5);
+  sfx.breach(); shake(5); buzz(30);
   // a kicked door startles whoever is standing behind it
   for (const e of enemies) {
     if (Math.hypot(e.x - d.cx, e.y - d.cy) > 270 || !los(d.cx, d.cy, e.x, e.y, 0)) continue;
@@ -868,7 +962,7 @@ function setMode(m) {
     $('over-score').textContent = S.score; $('over-kills').textContent = S.kills; $('over-saved').textContent = S.rescued; $('over-best').textContent = S.best;
   }
   if (m === 'play') { try { cv.focus({ preventScroll: true }); } catch (e) {} }
-  input.fire = false; input.joy = null; input.aimId = null;
+  input.fire = false; input.joy = null; input.aim = null; input.aimId = null;
 }
 function clearLists() { bullets = []; shots = []; drops = []; pools = []; shells = []; puffs = []; bangs = []; blasts = []; wet = []; floaters = []; }
 function startFloor(n) {
@@ -878,6 +972,7 @@ function startFloor(n) {
   S.bangs = 3; S.bangCd = 0; S.white = 0; S.fired = 0; S.hits = 0; S.saved = 0; S.total = hostages.length; S.clock = 0;
   P.stepD = 0; P.bloody = 0;
   reloadT = 0; cool = 0.2;
+  if (camOn() || touchMode) placeCam(true);
   banner('Floor ' + n, S.total ? S.total + (S.total === 1 ? ' hostage inside' : ' hostages inside') : '');
 }
 function newGame() {
@@ -950,7 +1045,7 @@ function detonate(b) {
 function explode(b) {
   b.dead = true;
   blasts.push({ x: b.x, y: b.y, t: 0, life: 0.34, R: 125, boom: true });
-  shake(12); sfx.boom();
+  shake(12); sfx.boom(); buzz(110);
   // scorch mark
   const gr = dctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, 64);
   gr.addColorStop(0, 'rgba(22,24,26,0.75)'); gr.addColorStop(1, 'rgba(22,24,26,0)');
@@ -1002,7 +1097,7 @@ function killEnemy(e, ang) {
   spray(e.x, e.y, ang, 24 + e.r, 560, 0.9);
   spray(e.x, e.y, rnd(0, TAU), 16, 280, Math.PI);
   pools.push(makePool(e.x, e.y, e.r, { type: e.type, ang: e.ang + rnd(-0.7, 0.7), r: e.r, wounds: e.wounds }));
-  shake(e.type === 'heavy' ? 8 : 3.5); sfx.kill();
+  shake(e.type === 'heavy' ? 8 : 3.5); sfx.kill(); buzz(18);
 }
 function secure(q, quiet) {
   q.state = 'safe'; S.saved++; S.rescued++; S.score += 100; P.hp = Math.min(100, P.hp + 10);
@@ -1018,6 +1113,7 @@ function loseHostage(q, ang) {
 }
 function hurtPlayer(dmg, ang) {
   if (S.mode !== 'play' || dmg <= 0) return;
+  buzz(dmg >= 25 ? 90 : 40);
   P.hp = Math.max(0, P.hp - dmg); P.hurt = 0.4; shake(8);
   spray(P.x, P.y, ang, 9, 300, 0.8); sfx.hurt();
   if (P.hp <= 0) gameOver();
@@ -1032,7 +1128,7 @@ function update(dt) {
     S.clock += dt;
     const g = GUNS[S.gun];
     let mx = input.right - input.left, my = input.down - input.up;
-    if (input.joy) { mx += clamp((input.joy.x - input.joy.ox) / 46, -1, 1); my += clamp((input.joy.y - input.joy.oy) / 46, -1, 1); }
+    if (input.joy) { mx += clamp((input.joy.x - input.joy.ox) / STICK, -1, 1); my += clamp((input.joy.y - input.joy.oy) / STICK, -1, 1); }
     const ml = Math.hypot(mx, my);
     if (ml > 0.05) {
       const k = Math.min(1, ml) / ml * 215 * (g.heavy ? 0.8 : 1) * dt;
@@ -1041,7 +1137,11 @@ function update(dt) {
     bump(P); touched = null; collide(P);
     if (touched) openDoor(touched, P.x, P.y, true);          // walking into a door kicks it in
     P.x = clamp(P.x, L.bx + P.r, L.bx + L.bw - P.r); P.y = clamp(P.y, L.by + P.r, L.by + L.bh - P.r);
-    if (input.mouse || input.aimId !== null) P.ang = Math.atan2(input.ay - P.y, input.ax - P.x);
+    if (input.aim) {
+      const dx = input.aim.x - input.aim.ox, dy = input.aim.y - input.aim.oy, d = Math.hypot(dx, dy);
+      if (d > 10) P.ang = assist(Math.atan2(dy, dx));
+      input.fire = d > STICK * 0.62;
+    } else if (input.mouse) P.ang = Math.atan2(input.ay - P.y, input.ax - P.x);
 
     const here = roomAt(P.x, P.y); if (here) here.revealed = true;
     for (const q of hostages) if (q.state === 'held' && Math.hypot(q.x - P.x, q.y - P.y) < P.r + q.r + 12) secure(q);
@@ -1209,6 +1309,7 @@ function drawShell(c, s) {
 
 /* ---------- draw ---------- */
 function draw() {
+  if (camOn()) placeCam(false);
   const useVis = S.mode !== 'title';
   if (useVis) computeVis();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1346,14 +1447,6 @@ function draw() {
   ctx.restore();
 
   if (S.mode === 'play') {
-    if (input.joy) {
-      const j = input.joy;
-      ctx.strokeStyle = COL.ink; ctx.globalAlpha = 0.35; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(j.ox, j.oy, 46, 0, TAU); ctx.stroke();
-      ctx.globalAlpha = 0.5; ctx.fillStyle = COL.ink;
-      const dx = j.x - j.ox, dy = j.y - j.oy, d = Math.hypot(dx, dy) || 1, k = Math.min(1, 46 / d);
-      ctx.beginPath(); ctx.arc(j.ox + dx * k, j.oy + dy * k, 16, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
-    }
     // crosshair with reload ring, outlined so it reads over dark rooms too
     if (input.mouse) {
       const x = input.ax, y = input.ay, R = 7 + GUNS[S.gun].spread * 42;
@@ -1377,6 +1470,7 @@ function draw() {
 
   // hurt vignette and flashbang whiteout, in viewport space
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (S.mode === 'play' && touchMode) drawTouch();
   const low = S.mode === 'play' && P.hp < 30 ? 0.16 + 0.07 * Math.sin(S.time * 6) : 0;
   const va = Math.max(low, P.hurt * 1.3);
   if (va > 0.01) {
@@ -1385,6 +1479,39 @@ function draw() {
     ctx.fillStyle = gr; ctx.fillRect(0, 0, VW, VH);
   }
   if (S.white > 0.01) { ctx.globalAlpha = Math.min(1, S.white * 1.3); ctx.fillStyle = COL.paper; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
+}
+
+function drawStick(st, fx, fy, label, firing) {
+  const ox = st ? st.ox : fx, oy = st ? st.oy : fy;
+  ctx.globalAlpha = st ? 0.55 : 0.22; ctx.lineWidth = 2.5; ctx.strokeStyle = COL.ink; ctx.fillStyle = COL.paper;
+  ctx.beginPath(); ctx.arc(ox, oy, STICK, 0, TAU); ctx.fill(); ctx.stroke();
+  if (label === 'AIM') { ctx.setLineDash([4, 5]); ctx.beginPath(); ctx.arc(ox, oy, STICK * 0.62, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+  let kx = ox, ky = oy;
+  if (st) { const dx = st.x - st.ox, dy = st.y - st.oy, d = Math.hypot(dx, dy) || 1, k = Math.min(1, STICK / d); kx += dx * k; ky += dy * k; }
+  ctx.globalAlpha = st ? 0.85 : 0.35; ctx.fillStyle = firing ? COL.blood : COL.ink;
+  ctx.beginPath(); ctx.arc(kx, ky, 20, 0, TAU); ctx.fill();
+  if (!st) {
+    ctx.globalAlpha = 0.5; ctx.fillStyle = COL.ink; ctx.font = '700 11px ' + BODY; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, ox, oy + STICK + 12);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawTouch() {
+  drawStick(input.joy, 30 + STICK + 8, VH - STICK - 30, 'MOVE', false);
+  drawStick(input.aim, VW - STICK - 40, VH - STICK - 30, 'AIM', input.fire);
+  // hostages you have not reached yet, when they are off the screen
+  for (const q of hostages) {
+    if (q.state !== 'held') continue;
+    const sx = q.x * vs + vox, sy = q.y * vs + voy;
+    if (sx > 0 && sx < VW && sy > 0 && sy < VH) continue;
+    const a = Math.atan2(sy - VH / 2, sx - VW / 2), m = 30;
+    const t = Math.min(Math.abs((VW / 2 - m) / (Math.cos(a) || 1e-6)), Math.abs((VH / 2 - m) / (Math.sin(a) || 1e-6)));
+    const x = VW / 2 + Math.cos(a) * t, y = VH / 2 + Math.sin(a) * t;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = COL.paper; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-7, -9); ctx.lineTo(-3, 0); ctx.lineTo(-7, 9); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
 }
 
 /* ---------- HUD ---------- */
@@ -1401,6 +1528,16 @@ const gunBtns = GUNS.map((g, i) => {
   rack.appendChild(b); return b;
 });
 let lastHp = -1, lastGun = -1;
+const pGunName = $('p-gun-name'), pAmmo = $('p-ammo'), pBangN = $('p-bang-n'), pBang = $('p-bang');
+function tapBtn(id, fn) {
+  const b = $(id);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.classList.add('on'); fn(); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => b.classList.remove('on'));
+  b.addEventListener('click', e => e.preventDefault());
+}
+tapBtn('p-gun', () => selectGun((S.gun + 1) % GUNS.length));
+tapBtn('p-bang', () => throwBang());
+tapBtn('p-reload', () => startReload());
 function hud() {
   if (P.hp !== lastHp) { lastHp = P.hp; elHp.style.width = P.hp + '%'; }
   setTxt(elWave, S.wave || 1);
@@ -1413,12 +1550,35 @@ function hud() {
   setTxt(elN, ammo[S.gun]); setTxt(elM, '/ ' + g.mag);
   elCount.classList.toggle('low', ammo[S.gun] <= g.mag * 0.2);
   setTxt(elBang, S.bangs); bangBtn.classList.toggle('empty', S.bangs === 0);
+  if (touchMode) {
+    setTxt(pGunName, reloadT > 0 ? 'Reloading' : g.name); setTxt(pAmmo, ammo[S.gun]);
+    setTxt(pBangN, S.bangs); pBang.classList.toggle('empty', S.bangs === 0);
+  }
   if (S.gun !== lastGun) { lastGun = S.gun; gunBtns.forEach((b, i) => b.setAttribute('aria-pressed', i === S.gun ? 'true' : 'false')); }
 }
 
 /* ---------- input ---------- */
+const STICK = 52;     // stick radius, CSS px
+// thumbs are not as exact as a mouse: pull the aim onto a hostile in view if it is close to where the stick points
+function assist(a) {
+  let best = null, bd = 0.2;
+  for (const e of enemies) {
+    const d = Math.hypot(e.x - P.x, e.y - P.y); if (d > 620) continue;
+    const ea = Math.atan2(e.y - P.y, e.x - P.x), off = Math.abs(((ea - a + Math.PI) % TAU + TAU) % TAU - Math.PI);
+    if (off < bd && los(P.x, P.y, e.x, e.y, 0)) { bd = off; best = ea; }
+  }
+  return best === null ? a : best;
+}
 const KEYS = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' };
-function begin() { initAudio(); newGame(); setMode('play'); }
+function goFull() {
+  if (!touchMode) return;
+  try {
+    const el = document.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+    const after = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) {} };
+    if (rq && !document.fullscreenElement) { const pr = rq.call(el, { navigationUI: 'hide' }); if (pr && pr.then) pr.then(after, () => {}); else after(); } else after();
+  } catch (e) {}
+}
+function begin() { initAudio(); goFull(); newGame(); setMode('play'); }
 window.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = KEYS[e.code];
@@ -1447,9 +1607,12 @@ cv.addEventListener('pointerdown', e => {
   if (S.mode !== 'play') return;
   const p = pos(e);
   if (e.pointerType === 'touch') {
-    input.mouse = false;
-    if (p.x < W * 0.42 && !input.joy) input.joy = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
-    else { input.aimId = e.pointerId; input.ax = p.x; input.ay = p.y; input.fire = true; }
+    setTouch(true);
+    const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+    const stick = { id: e.pointerId, ox: sx, oy: sy, x: sx, y: sy };
+    if (sx < VW * 0.5) { if (!input.joy) input.joy = stick; }
+    else if (!input.aim) input.aim = stick;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
   } else {
     input.mouse = true; input.ax = p.x; input.ay = p.y;
     if (e.button === 2) throwBang();
@@ -1460,14 +1623,19 @@ cv.addEventListener('pointerdown', e => {
 window.addEventListener('pointermove', e => {
   const p = pos(e);
   if (e.pointerType === 'touch') {
-    if (input.joy && input.joy.id === e.pointerId) { input.joy.x = p.x; input.joy.y = p.y; }
-    else if (input.aimId === e.pointerId) { input.ax = p.x; input.ay = p.y; }
+    const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+    for (const st of [input.joy, input.aim]) {
+      if (!st || st.id !== e.pointerId) continue;
+      st.x = sx; st.y = sy;
+      const dx = sx - st.ox, dy = sy - st.oy, d = Math.hypot(dx, dy), max = STICK * 1.25;
+      if (d > max) { st.ox = sx - dx / d * max; st.oy = sy - dy / d * max; }   // the stick base follows a thumb that slides too far
+    }
   } else { input.mouse = true; input.ax = p.x; input.ay = p.y; }
 });
 function release(e) {
   if (e.pointerType === 'touch') {
     if (input.joy && input.joy.id === e.pointerId) input.joy = null;
-    if (input.aimId === e.pointerId) { input.aimId = null; input.fire = false; }
+    if (input.aim && input.aim.id === e.pointerId) { input.aim = null; input.fire = false; }
   } else if (e.button === 0 || e.type === 'pointercancel') input.fire = false;
 }
 window.addEventListener('pointerup', release);
@@ -1484,7 +1652,7 @@ $('btn-sound').addEventListener('click', e => { toggleSound(); e.currentTarget.b
 $('btn-pause').addEventListener('click', e => { e.currentTarget.blur(); togglePause(); });
 $('btn-start').addEventListener('click', begin);
 $('btn-again').addEventListener('click', begin);
-$('btn-resume').addEventListener('click', () => { initAudio(); setMode('play'); });
+$('btn-resume').addEventListener('click', () => { initAudio(); goFull(); setMode('play'); });
 window.addEventListener('blur', () => { if (S.mode === 'play') setMode('paused'); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') setMode('paused'); });
 window.addEventListener('resize', onResize);
@@ -1519,12 +1687,13 @@ function buildTitle() {
 /* ---------- loop ---------- */
 let last = 0;
 function frame(now) {
-  const dt = Math.min(0.034, (now - last) / 1000 || 0); last = now;
+  const dt = Math.min(0.034, (now - last) / 1000 || 0); last = now; frameDt = dt;
   if (S.mode !== 'paused') update(dt);
   draw(); hud();
   requestAnimationFrame(frame);
 }
 function start(data) {
+  try { if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) setTouch(true); } catch (e) {}
   measure(); lastVW = VW; lastVH = VH; loadBest();
   if (data && data.playing) {
     newGame();
@@ -1534,6 +1703,16 @@ function start(data) {
     setMode('paused');
   } else { buildTitle(); setMode('title'); }
   requestAnimationFrame(frame);
+}
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('btn-install').hidden = false; });
+$('btn-install').addEventListener('click', () => {
+  if (!installEvt) return;
+  try { installEvt.prompt(); installEvt.userChoice.then(() => { installEvt = null; $('btn-install').hidden = true; }, () => {}); } catch (e) {}
+});
+window.addEventListener('appinstalled', () => { $('btn-install').hidden = true; });
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
 }
 const hot = window.claude && window.claude.hot;
 if (hot && hot.snapshot) hot.snapshot(() => ({ playing: S.mode === 'play' || S.mode === 'paused', score: S.score, kills: S.kills, rescued: S.rescued, wave: S.wave, hp: P.hp, gun: S.gun }));
