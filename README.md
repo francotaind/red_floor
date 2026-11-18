@@ -26,6 +26,13 @@ Phone controls: left thumb moves, right thumb aims (push further to fire, with a
 
 Silenced pistol, revolver, SMG, shotgun (also blows doors open), assault rifle, sniper rifle (goes through several hostiles) and machine gun.
 
+## Ammo and health
+
+- **Ammo is limited.** The counter shows rounds loaded / spare rounds. Reloading takes from your spare rounds, and you start with a few spare magazines for most guns.
+- **Ammo caches** sit in the rooms. Each is marked with the gun it's for: walk over it to take the rounds. Hostiles sometimes drop ammo too, heavies most often.
+- A gun with nothing left is struck through on the rack, and firing it switches to the next gun that still has rounds. With every gun empty, you strike with the butt of your gun.
+- **Snacks heal you:** chocolate +10, soda +15, sandwich +25. One or two are in the building at the start, and more turn up during the floor in rooms you've already cleared.
+
 ## What's in a floor
 
 - **Line of sight:** you only see what your operator can see; rooms you haven't entered stay dark.

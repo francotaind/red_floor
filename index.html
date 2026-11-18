@@ -72,6 +72,8 @@ button{touch-action:manipulation}
 .gun svg{width:40px;height:15px;fill:currentColor;margin-bottom:5px}
 .gun[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 .gun[aria-pressed="true"] kbd{opacity:1;color:var(--blood)}
+.gun.dry svg{opacity:.3}
+.gun.dry::after{content:"";position:absolute;left:6px;right:6px;top:50%;border-top:2px solid var(--blood);transform:rotate(-12deg)}
 .bang{pointer-events:auto;cursor:pointer;height:40px;display:flex;align-items:center;gap:7px;padding:0 10px;
   color:var(--ink);background:var(--paper);border:2px solid var(--ink);font:600 13px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase}
 .bang kbd{font:700 12px/1 var(--font-body);opacity:.7}
@@ -200,7 +202,7 @@ button:focus-visible{outline:3px solid var(--blood);outline-offset:3px}
     <div class="dock">
       <div class="readout">
         <span class="label" id="gun-name">Pistol</span>
-        <div class="count" id="count"><b id="ammo-n">15</b><small id="ammo-m">/ 15</small></div>
+        <div class="count" id="count" title="Loaded / spare"><b id="ammo-n">15</b><small id="ammo-m">/ 30</small></div>
       </div>
       <button class="bang" id="btn-bang" type="button" aria-label="Throw a flashbang"><kbd>F</kbd><span>Flash</span><b id="bang-n">3</b></button>
       <div class="rack" id="rack" role="group" aria-label="Guns"></div>
@@ -216,7 +218,7 @@ button:focus-visible{outline:3px solid var(--blood);outline-offset:3px}
   <div class="overlay" id="overlay">
     <section class="panel" id="scr-title">
       <h1><span>Red</span>Floor</h1>
-      <p class="lede">Clear the building room by room. You only see what your operator sees, so check corners, kick doors in and throw a flashbang before you enter. Keep the hostages alive.</p>
+      <p class="lede">Clear the building room by room. You only see what your operator sees, so check corners, kick doors in and throw a flashbang before you enter. Keep the hostages alive. Ammo is limited, so pick up the caches in the rooms, and eat whatever snacks turn up to heal.</p>
       <dl class="keys">
         <div class="k-touch"><dt>Move</dt><dd>Left thumb, anywhere on the left half</dd>
         <dt>Aim</dt><dd>Right thumb; push further to fire</dd>
@@ -319,6 +321,12 @@ const P = { x: 0, y: 0, r: 13, hp: 100, ang: 0, hurt: 0, recoil: 0, stepD: 0, bl
 const S = { mode: 'title', score: 0, kills: 0, rescued: 0, wave: 1, best: 0, gun: 0, phase: 'fight', inter: 0, shake: 0, flash: 0, time: 0, navT: 0,
             bangs: 3, bangCd: 0, white: 0, fired: 0, hits: 0, saved: 0, total: 0, clock: 0 };
 let ammo = GUNS.map(g => g.mag), reloadT = 0, cool = 0;
+// spare rounds carried for each gun, on top of what is loaded; the most you can carry is four magazines
+const START_SPARE = [30, 6, 30, 7, 30, 5, 0];
+let spare = START_SPARE.slice();
+const maxSpare = i => GUNS[i].mag * (i === 6 ? 2 : 4);
+const hasAmmo = i => ammo[i] + spare[i] > 0;
+let pickups = [];      // ammo caches and snacks on the floor
 let enemies = [], bullets = [], shots = [], drops = [], pools = [], shells = [], puffs = [];
 let barrels = [], hostages = [], bangs = [], blasts = [], wet = [], floaters = [];
 const input = { up: 0, down: 0, left: 0, right: 0, fire: false, ax: 0, ay: 0, joy: null, aim: null, aimId: null, mouse: true };
@@ -610,7 +618,38 @@ function buildLevel(floor) {
     const s = freeSpot(room, 38, (x, y) => clearOfDoors(x, y) && !barrels.some(b => Math.hypot(b.x - x, b.y - y) < 44));
     if (s) hostages.push({ x: s.x, y: s.y, r: 11, ang: rnd(0, TAU), state: 'held' });
   }
+  // ammo caches spread through the rooms, more on later floors; a snack or two to start with
+  pickups = [];
+  const nCache = clamp(Math.round(others.length * 0.6) + (floor >> 2), 2, 8);
+  const cacheRooms = others.slice().sort(() => Math.random() - 0.5);
+  for (let k = 0; k < nCache; k++) placePickup(cacheRooms[k % cacheRooms.length], cacheKind(), clearOfDoors);
+  for (let k = 0; k < 1 + (Math.random() < 0.5 ? 1 : 0); k++) placePickup(pick(others), snackKind(), clearOfDoors);
   drawFloor();
+}
+// which gun a cache is for: the everyday guns turn up most, the heavy ones least
+const CACHE_WEIGHT = [5, 2, 4, 3, 4, 1.2, 1];
+function cacheKind(prefer) {
+  let total = 0; const w = CACHE_WEIGHT.map((v, i) => (prefer && prefer.includes(i) ? v * 3 : v));
+  for (const v of w) total += v;
+  let r = Math.random() * total, gun = 0;
+  for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) { gun = i; break; } }
+  const g = GUNS[gun];
+  return { kind: 'ammo', gun, amount: gun === 6 ? 50 : g.mag * (g.mag <= 7 ? 2 : 1) };
+}
+const SNACKS = [
+  { name: 'Chocolate', heal: 10 },
+  { name: 'Soda', heal: 15 },
+  { name: 'Sandwich', heal: 25 }
+];
+function snackKind() { const i = Math.random() < 0.4 ? 0 : Math.random() < 0.6 ? 1 : 2; return { kind: 'snack', snack: i, heal: SNACKS[i].heal }; }
+function placePickup(room, item, ok) {
+  if (!room) return false;
+  const s = freeSpot(room, 30, (x, y) => (!ok || ok(x, y)) && !barrels.some(b => Math.hypot(b.x - x, b.y - y) < 32)
+    && !hostages.some(q => Math.hypot(q.x - x, q.y - y) < 36) && !pickups.some(p => Math.hypot(p.x - x, p.y - y) < 40)
+    && Math.hypot(P.x - x, P.y - y) > 60);
+  if (!s) return false;
+  pickups.push(Object.assign({ x: s.x, y: s.y, t: 0, bob: rnd(0, TAU) }, item));
+  return true;
 }
 function populate(floor) {
   enemies = [];
@@ -892,6 +931,39 @@ function drawBarrel(c, b) {
   if (b.fuse !== null) { c.globalAlpha = 0.7; c.fillStyle = COL.paper; c.beginPath(); c.arc(0, 0, b.r, 0, TAU); c.fill(); }
   c.restore();
 }
+const GUN_PATHS = GUNS.map(g => { try { return new Path2D(g.icon); } catch (e) { return null; } });
+function drawPickup(c, it) {
+  const pop = it.t < 0.35 ? 1 + Math.sin(it.t / 0.35 * Math.PI) * 0.5 : 1;          // a little pop when it appears
+  const bob = RM ? 0 : Math.sin(S.time * 3 + it.bob) * 1.5;
+  c.save(); c.translate(it.x, it.y + bob); c.scale(pop, pop);
+  // a slow pulse ring, so pickups catch the eye on a busy floor
+  if (!RM) { const k = (S.time * 0.8 + it.bob) % 1; c.globalAlpha = 0.35 * (1 - k); c.strokeStyle = it.kind === 'snack' ? COL.blood : COL.ink; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, 14 + k * 14, 0, TAU); c.stroke(); c.globalAlpha = 1; }
+  c.globalAlpha = 0.14; c.fillStyle = COL.ink; c.beginPath(); c.ellipse(2, 9, 13, 4, 0, 0, TAU); c.fill(); c.globalAlpha = 1;
+  c.lineJoin = 'round';
+  if (it.kind === 'ammo') {
+    const w = it.small ? 24 : 32, h = it.small ? 16 : 20;
+    c.fillStyle = COL.paper; c.strokeStyle = COL.ink; c.lineWidth = 2;
+    c.beginPath(); c.rect(-w / 2, -h / 2, w, h); c.fill(); c.stroke();
+    c.fillStyle = COL.ink; c.fillRect(-w / 2, -h / 2, w, 4);                               // lid band
+    const path = GUN_PATHS[it.gun];
+    if (path) { c.save(); c.translate(-w / 2 + 3, -h / 2 + 5); const k = (w - 6) / 64; c.scale(k, k); c.fill(path); c.restore(); }
+  } else if (it.snack === 0) {                       // chocolate bar
+    c.rotate(-0.3); c.fillStyle = COL.ink; c.strokeStyle = COL.paper; c.lineWidth = 1.2;
+    c.fillRect(-11, -6, 22, 12);
+    c.beginPath(); for (const x of [-4, 3]) { c.moveTo(x, -6); c.lineTo(x, 6); } c.moveTo(-11, 0); c.lineTo(11, 0); c.stroke();
+    c.fillStyle = COL.blood; c.fillRect(-11, -6, 6, 12);                                   // wrapper
+  } else if (it.snack === 1) {                       // soda can
+    c.fillStyle = COL.paper; c.strokeStyle = COL.ink; c.lineWidth = 2;
+    c.beginPath(); c.arc(0, 0, 9, 0, TAU); c.fill(); c.stroke();
+    c.strokeStyle = COL.blood; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 5.5, 0, TAU); c.stroke();
+    c.fillStyle = COL.ink; c.fillRect(-1.5, -4, 3, 4);                                     // ring pull
+  } else {                                           // sandwich
+    c.rotate(0.2); c.fillStyle = COL.paper; c.strokeStyle = COL.ink; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(-12, 8); c.lineTo(12, 8); c.lineTo(-12, -10); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = COL.blood; c.lineWidth = 2.4; c.beginPath(); c.moveTo(-9, 4.5); c.lineTo(5, 4.5); c.stroke();   // filling
+  }
+  c.restore();
+}
 function drawCover(c, k) {
   if (k.crate) {
     c.fillStyle = COL.paper; c.strokeStyle = COL.ink; c.lineWidth = 2.5;
@@ -964,11 +1036,12 @@ function setMode(m) {
   if (m === 'play') { try { cv.focus({ preventScroll: true }); } catch (e) {} }
   input.fire = false; input.joy = null; input.aim = null; input.aimId = null;
 }
-function clearLists() { bullets = []; shots = []; drops = []; pools = []; shells = []; puffs = []; bangs = []; blasts = []; wet = []; floaters = []; }
+function clearLists() { pickups = []; bullets = []; shots = []; drops = []; pools = []; shells = []; puffs = []; bangs = []; blasts = []; wet = []; floaters = []; }
 function startFloor(n) {
   S.wave = n; S.phase = 'fight'; S.navT = 0;
   clearLists();
   buildLevel(n); populate(n);
+  S.snackT = rnd(10, 16);
   S.bangs = 3; S.bangCd = 0; S.white = 0; S.fired = 0; S.hits = 0; S.saved = 0; S.total = hostages.length; S.clock = 0;
   P.stepD = 0; P.bloody = 0;
   reloadT = 0; cool = 0.2;
@@ -978,7 +1051,7 @@ function startFloor(n) {
 function newGame() {
   P.hp = 100; P.hurt = 0; P.recoil = 0;
   S.score = 0; S.kills = 0; S.rescued = 0; S.gun = 0; S.shake = 0; S.flash = 0;
-  ammo = GUNS.map(g => g.mag);
+  ammo = GUNS.map(g => g.mag); spare = START_SPARE.slice();
   input.up = input.down = input.left = input.right = 0;
   startFloor(1);
 }
@@ -996,17 +1069,43 @@ function selectGun(i) {
   S.gun = i; reloadT = 0; cool = Math.max(cool, 0.18);
   if (ammo[i] <= 0) startReload();
 }
+// next gun along the rack that still has rounds, or -1
+function nextLoaded(from, dir) {
+  for (let k = 1; k <= GUNS.length; k++) { const i = (from + dir * k + GUNS.length * 2) % GUNS.length; if (hasAmmo(i)) return i; }
+  return -1;
+}
+function cycleGun(dir) { const i = nextLoaded(S.gun, dir); if (i >= 0) selectGun(i); else selectGun((S.gun + dir + GUNS.length) % GUNS.length); }
 function startReload() {
   const g = GUNS[S.gun];
-  if (reloadT > 0 || ammo[S.gun] >= g.mag) return;
+  if (reloadT > 0 || ammo[S.gun] >= g.mag || spare[S.gun] <= 0) return;
   reloadT = g.reload; sfx.reload();
+}
+function finishReload() {
+  const i = S.gun, take = Math.min(GUNS[i].mag - ammo[i], spare[i]);
+  ammo[i] += take; spare[i] -= take; sfx.reload();
+}
+// out of rounds in every gun: you can still strike with the butt of the gun
+function bash() {
+  cool = 0.45; P.recoil = 6; sfx.hit();
+  let best = null, bd = 1e9;
+  for (const e of enemies) {
+    const d = Math.hypot(e.x - P.x, e.y - P.y), off = Math.abs(((Math.atan2(e.y - P.y, e.x - P.x) - P.ang + Math.PI) % TAU + TAU) % TAU - Math.PI);
+    if (d < P.r + e.r + 20 && off < 1.0 && d < bd) { bd = d; best = e; }
+  }
+  if (best) hitEnemy(best, { vx: Math.cos(P.ang), vy: Math.sin(P.ang), dmg: 45, knock: 160 }, best.x - Math.cos(P.ang) * best.r, best.y - Math.sin(P.ang) * best.r);
 }
 function shake(k) { if (!RM) S.shake = Math.min(14, S.shake + k); }
 
 function tryFire() {
   if (S.mode !== 'play' || reloadT > 0 || cool > 0) return;
   const g = GUNS[S.gun];
-  if (ammo[S.gun] <= 0) { sfx.empty(); startReload(); return; }
+  if (ammo[S.gun] <= 0) {
+    if (spare[S.gun] > 0) { startReload(); return; }
+    const i = nextLoaded(S.gun, 1);
+    if (i >= 0) { sfx.empty(); selectGun(i); floaters.push({ x: P.x, y: P.y - 22, text: 'Out of ammo', t: 0.4, bad: true }); }
+    else bash();
+    return;
+  }
   ammo[S.gun]--; cool = g.rate; S.fired += g.pellets;
   const ca = Math.cos(P.ang), sa = Math.sin(P.ang), reach = P.r + g.len;
   let mx = P.x + ca * reach, my = P.y + sa * reach;
@@ -1098,6 +1197,12 @@ function killEnemy(e, ang) {
   spray(e.x, e.y, rnd(0, TAU), 16, 280, Math.PI);
   pools.push(makePool(e.x, e.y, e.r, { type: e.type, ang: e.ang + rnd(-0.7, 0.7), r: e.r, wounds: e.wounds }));
   shake(e.type === 'heavy' ? 8 : 3.5); sfx.kill(); buzz(18);
+  const dropChance = e.type === 'heavy' ? 0.75 : e.type === 'gunman' ? 0.4 : 0.12;
+  if (pickups.length < 24 && Math.random() < dropChance) {
+    const it = cacheKind(e.type === 'heavy' ? [3, 6] : e.type === 'gunman' ? [2, 4] : [0]);
+    it.amount = Math.ceil(it.amount / 2); it.small = true;
+    pickups.push(Object.assign({ x: e.x + rnd(-10, 10), y: e.y + rnd(-10, 10), t: 0, bob: rnd(0, TAU) }, it));
+  }
 }
 function secure(q, quiet) {
   q.state = 'safe'; S.saved++; S.rescued++; S.score += 100; P.hp = Math.min(100, P.hp + 10);
@@ -1145,11 +1250,40 @@ function update(dt) {
 
     const here = roomAt(P.x, P.y); if (here) here.revealed = true;
     for (const q of hostages) if (q.state === 'held' && Math.hypot(q.x - P.x, q.y - P.y) < P.r + q.r + 12) secure(q);
+    for (const it of pickups) {
+      if (Math.hypot(it.x - P.x, it.y - P.y) > P.r + 14) continue;
+      if (it.kind === 'ammo') {
+        const room = maxSpare(it.gun) - spare[it.gun];
+        if (room <= 0) { if (!it.full) { it.full = true; floaters.push({ x: it.x, y: it.y - 16, text: GUNS[it.gun].name + ' full', t: 0.3 }); } continue; }
+        const got = Math.min(room, it.amount); spare[it.gun] += got; it.amount -= got;
+        floaters.push({ x: it.x, y: it.y - 16, text: '+' + got + ' ' + GUNS[it.gun].name, t: 0 }); sfx.reload(); buzz(15);
+        if (it.gun === S.gun && ammo[S.gun] === 0) startReload();
+        if (it.amount <= 0) it.dead = true;
+      } else {
+        if (P.hp >= 100) { if (!it.full) { it.full = true; floaters.push({ x: it.x, y: it.y - 16, text: 'Health full', t: 0.3 }); } continue; }
+        const got = Math.min(100 - P.hp, it.heal); P.hp += got; it.dead = true;
+        floaters.push({ x: it.x, y: it.y - 16, text: SNACKS[it.snack].name + ' +' + got, t: 0 }); sfx.secure(); buzz(15);
+      }
+    }
+    for (const it of pickups) if (it.full && Math.hypot(it.x - P.x, it.y - P.y) > P.r + 40) it.full = false;
+    pickups = pickups.filter(it => !it.dead);
+    // now and then a snack turns up in a room you have already been through, out of your sight
+    S.snackT -= dt;
+    if (S.snackT <= 0 && S.phase === 'fight') {
+      S.snackT = rnd(14, 22);
+      if (pickups.filter(it => it.kind === 'snack').length < 3) {
+        const seen = L.rooms.filter(r => r.revealed && r !== roomAt(P.x, P.y));
+        for (let k = 0; k < 4 && seen.length; k++) {
+          const room = pick(seen);
+          if (placePickup(room, snackKind(), (x, y) => !los(P.x, P.y, x, y, 0))) { pickups[pickups.length - 1].t = -0.01; break; }
+        }
+      }
+    }
 
     S.navT -= dt; if (S.navT <= 0) { flow(); S.navT = 0.25; }
 
     cool = Math.max(0, cool - dt); S.bangCd = Math.max(0, S.bangCd - dt);
-    if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) { reloadT = 0; ammo[S.gun] = g.mag; sfx.reload(); } }
+    if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) { reloadT = 0; finishReload(); } }
     if (input.fire) tryFire();
 
     if (S.phase === 'fight') {
@@ -1269,6 +1403,7 @@ function update(dt) {
   bangs = bangs.filter(b => !b.dead);
   for (const b of blasts) b.t += dt;
   blasts = blasts.filter(b => b.t < b.life);
+  for (const it of pickups) it.t += dt;
   for (const f of floaters) f.t += dt;
   floaters = floaters.filter(f => f.t < 1.4);
   for (const w of wet) w.t -= dt;
@@ -1329,6 +1464,7 @@ function draw() {
   ctx.globalAlpha = 1;
   for (const k of L.cover) drawCover(ctx, k);
   for (const b of barrels) drawBarrel(ctx, b);
+  for (const it of pickups) drawPickup(ctx, it);
   for (const q of hostages) drawHostage(ctx, q.x, q.y, q.ang, q.state);
 
   // things that move: only where the operator has a line of sight
@@ -1535,7 +1671,7 @@ function tapBtn(id, fn) {
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => b.classList.remove('on'));
   b.addEventListener('click', e => e.preventDefault());
 }
-tapBtn('p-gun', () => selectGun((S.gun + 1) % GUNS.length));
+tapBtn('p-gun', () => cycleGun(1));
 tapBtn('p-bang', () => throwBang());
 tapBtn('p-reload', () => startReload());
 function hud() {
@@ -1547,11 +1683,12 @@ function hud() {
   setTxt(elScore, S.score); setTxt(elBest, Math.max(S.best, S.score));
   const g = GUNS[S.gun];
   setTxt(elName, reloadT > 0 ? 'Reloading' : g.name);
-  setTxt(elN, ammo[S.gun]); setTxt(elM, '/ ' + g.mag);
+  setTxt(elN, ammo[S.gun]); setTxt(elM, '/ ' + spare[S.gun]);
   elCount.classList.toggle('low', ammo[S.gun] <= g.mag * 0.2);
+  gunBtns.forEach((b, i) => b.classList.toggle('dry', !hasAmmo(i)));
   setTxt(elBang, S.bangs); bangBtn.classList.toggle('empty', S.bangs === 0);
   if (touchMode) {
-    setTxt(pGunName, reloadT > 0 ? 'Reloading' : g.name); setTxt(pAmmo, ammo[S.gun]);
+    setTxt(pGunName, reloadT > 0 ? 'Reloading' : g.name); setTxt(pAmmo, ammo[S.gun] + '·' + spare[S.gun]);
     setTxt(pBangN, S.bangs); pBang.classList.toggle('empty', S.bangs === 0);
   }
   if (S.gun !== lastGun) { lastGun = S.gun; gunBtns.forEach((b, i) => b.setAttribute('aria-pressed', i === S.gun ? 'true' : 'false')); }
@@ -1594,8 +1731,8 @@ window.addEventListener('keydown', e => {
   if (S.mode !== 'play') return;
   const n = /^(Digit|Numpad)([1-9])$/.exec(e.code);
   if (n) selectGun(+n[2] - 1);
-  else if (e.code === 'KeyQ') selectGun((S.gun + GUNS.length - 1) % GUNS.length);
-  else if (e.code === 'KeyE') selectGun((S.gun + 1) % GUNS.length);
+  else if (e.code === 'KeyQ') cycleGun(-1);
+  else if (e.code === 'KeyE') cycleGun(1);
   else if (e.code === 'KeyR') startReload();
   else if (e.code === 'KeyF' || e.code === 'KeyG') throwBang();
   else if (e.code === 'Space') e.preventDefault();
@@ -1643,7 +1780,7 @@ window.addEventListener('pointercancel', release);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   if (S.mode !== 'play') return;
-  selectGun((S.gun + (e.deltaY > 0 ? 1 : GUNS.length - 1)) % GUNS.length);
+  cycleGun(e.deltaY > 0 ? 1 : -1);
 }, { passive: true });
 
 function toggleSound() { muted = !muted; $('btn-sound').textContent = muted ? 'Unmute' : 'Mute'; }

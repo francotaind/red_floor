@@ -1,5 +1,5 @@
 // Red Floor offline cache: the game shell is fetched fresh when online and served from cache when not.
-const CACHE = 'red-floor-v1';
+const CACHE = 'red-floor-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
